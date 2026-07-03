@@ -8,3 +8,7 @@ eda_out/
 eda_*/
 *.Zone.Identifier
 *Zone.Identifier
+submission_final.xlsx
+output/
+lean_out/
+scores_out/
