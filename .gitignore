@@ -1,0 +1,10 @@
+# competition data & generated outputs (not committed)
+*.csv
+!6a3eb1af6b994_feature_description.csv
+book1*.csv
+sample_*.csv
+scores_out/
+eda_out/
+eda_*/
+*.Zone.Identifier
+*Zone.Identifier
