@@ -12,3 +12,5 @@ submission_final.xlsx
 output/
 lean_out/
 scores_out/
+__pycache__/
+*.pyc
