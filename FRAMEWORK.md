@@ -1,67 +1,74 @@
-# Premier Card Profitability — Round 1 Framework
+# Premier Card Profitability — Round 1 Final Submission
 
-Rank-orders premier cardmembers by estimated profitability to the issuer and
-flags the top 20%. No target variable exists, so the score is a **business-driven
-unit-economics equation**, rank-normalized and validated by philosophy-agreement
-and assumption-sensitivity rather than by fitting.
+Rank-orders premier cardmembers by estimated profitability and flags the top 20%.
+No target variable exists, so the score is a **business-driven, rank-normalized
+unit-economics ensemble**, validated by philosophy-agreement and
+assumption-sensitivity rather than by fitting.
 
-## Pipeline
+## Final model — ENSEMBLE (rank-average of two forms)
 
-| Script | Purpose |
-|--------|---------|
-| `eda_premier.py` | Full EDA: distributions, missingness, outliers, skew, correlation, redundancy checks, unsupervised importance. |
-| `score_premier.py` | Builds S1–S5 scores, emits ranked `Prediction`, runs validation (A) philosophy agreement + (B) assumption sensitivity. |
+Chosen over any single model because two functional forms that agree on the
+profitable core but fail differently reduce variance on the hidden 30% private
+leaderboard.
 
-Run:
 ```
-python eda_premier.py   --data <data.csv> --out eda_out
-python score_premier.py --data <data.csv> --out scores_out   # -> scores_out/predictions.csv
+spend    = 0.5·rank(f5) + 0.5·rank(f6+f7+f8+f9+f10)      # f5 ⟂ categories → blend hedge
+risk     = rank(f11)
+interest = rank(f1 · (1 − risk))                         # risk-adjusted revolve interest
+cost     = rank(f21 + f14 + 50·f13 + 15·f15)             # rewards + benefit give-backs
+rel      = rank(f19)
+
+# Model A — unit-economics, multiplicative risk gate
+A = (0.45·spend + 0.20·interest − 0.20·cost) · (1 − 0.50·risk) · (1 + 0.15·rel) − 0.10·f3
+
+# Model B — lean additive spend model
+B = spend − 0.40·risk + 0.30·interest − 0.30·cost
+
+Prediction = rank( 0.5·rank(A) + 0.5·rank(B) )           # (0,1], higher = more profitable
 ```
 
-## Key data facts (from EDA on 274K rows)
+### Coefficients
+| Coef | Value | Meaning |
+|---|---|---|
+| α 0.45 | spend weight — interchange is the dominant charge-card revenue |
+| β 0.20 | risk-adjusted interest — real but secondary (53% never revolve) |
+| γ 0.20 | variable cost (rewards + benefits) |
+| λ 0.50 | multiplicative risk penalty — cannot be out-spent |
+| ρ 0.15 | relationship-depth bonus (stickiness/LTV) |
+| δ 0.10 | collections hard penalty (distress) |
+| a,b,c | 0.40/0.30/0.30 — Model B additive weights |
 
-- **Winsorized/synthetic data:** ~2.6% of every monetary feature sits at an identical
-  cap (e.g. f7=146700.554, f1=17967.726). f16 has 35% at its cap (low signal).
-- **Missingness is 100% structural**, in blocks: {f6–f10} (23%), {f4,f21} (51%),
-  {f17} (58%), {f23} (88%). Encoded as flags, imputed to 0.
-- **f5 is NOT the category-spend total** (1.3% match) — different scale; categories carry spend.
-- **Redundancy:** f17~f18 = 0.93 (drop one); spend block f6–f10 = 0.64–0.80 (one factor).
-- **Validated interactions:** f1~f11 = +0.58 (revolve×risk), f11~f3 = +0.45 (risk×collections)
-  → confirms higher f11 = riskier; revolve revenue must be risk-attenuated.
+## Transformations & scaling
+- Percentile-rank every input → [0,1]; immune to the ~2.6% winsorization caps and skew (1.4–2.8).
+- Missing → 0 (genuine non-user) + informative flags for blocks {f6–f10},{f4,f21},{f17},{f23}.
+- Negative Other Spend (f7) floored at 0.
 
-## Scoring philosophies
+## Assumptions that CANNOT be verified without labels
+1. **Which spend metric the target uses** — f5 and Σ(f6–f10) are orthogonal (rank corr ≈ 0.01,
+   top-20% overlap 0.15). We blend 50/50; resolve on the public leaderboard if submissions allow.
+2. **Coefficient magnitudes** — expert/AHP-set from card economics, not fitted.
+3. **That risk enters profit beyond spend** — f11 is already −0.38 correlated with spend.
 
-| Score | Philosophy | Idea |
-|-------|-----------|------|
-| S1 | Conservative Banking | Loss-avoidance dominates |
-| S2 | Revenue Maximization | Interchange + interest top-line |
-| S3 | Long-term Value | Relationship depth + tenure + retention |
-| S4 | Premium Card Economics | Faithful revenue − cost − expected-loss P&L |
-| **S5** | **Balanced (submitted)** | Mean of percentile-ranks of S1–S4 |
-
-**S4 equation (dollar unit-economics):**
-```
-Profit = Interchange + Interest − Rewards − Benefits − Servicing − ExpectedLoss
-Interchange   = 0.018 · (1.0·f7 + 0.9·f10 + 0.8·f8 + 0.6·f6 + 0.6·f9)
-Interest      = 0.18 · f1
-Rewards       = 0.010 · f21
-Benefits      = f14 + f16 + 50·f13 + 15·f15
-Servicing     = 20·f2 + 100·f3
-ExpectedLoss  = f11 · (f1 + 0.1·f17) · 0.90
-```
+Verified in data: f11 higher = riskier (r=+0.45 w/ collections); f17≈f18 (r=0.93, dropped one).
+No demographics/tenure in data (f4 ≈ tenure proxy, f17 ≈ affluence proxy).
 
 ## Validation (unsupervised, parameter-free)
+- **Philosophy agreement:** risk/revenue/unit-econ converge (top-20% Jaccard 0.53–0.57).
+- **Assumption sensitivity:** top-20% is 73–97% stable under ±30–50% coefficient/rate shocks.
+- **Face validity:** top-20% show ~2.8× non-travel spend, ~1.9× revolve, ~0.1× risk, ~0 collections.
 
-- **(A) Philosophy agreement:** risk/revenue/unit-econ converge (top-20% Jaccard 0.53–0.57);
-  LTV deliberately diverges (0.22–0.35). S5 sits in the consensus (Spearman 0.74–0.95).
-- **(B) Assumption sensitivity:** S4 top-20% is **80–97% stable** under ±30–50% rate shocks.
-- **(C) Face validity:** top-20% show 6.5× non-travel spend, 2.9× revolve, ~1/10th risk,
-  ~0 collections — the correct profitable-premier profile.
+## Reproduce
+```
+pip install -r requirements.txt
+python final_submission.py \
+    --data <official_500k_dataset.csv> \
+    --template 6a3cb64c7cae4_campus_challenge_r1_submission_template.xlsx \
+    --out submission_final.xlsx
+```
+Deterministic; runs unchanged on all 500K `unique_identifiers`. Prints a validation
+report and writes `submission_final.xlsx` (Predictions + filled Profitability Framework).
 
-## Assumptions & limits
-
-- No demographics/tenure in data; f4 ≈ tenure proxy, f17 ≈ affluence proxy.
-- Rates (interchange 1.8%, net APR 18%, $0.010/point, LGD 0.90) are industry-reasonable,
-  not fitted. Annual fee is constant across premier holders → omitted (no rank effect).
-- Available data is a 274K sample; `score_premier.py` runs unchanged on all 500K
-  `unique_identifiers` for the final submission.
+## Files
+`final_submission.py` (submission generator) · `score_lean.py` (leaderboard probes) ·
+`score_premier.py` (S1–S5 philosophies) · `eda_premier.py` (EDA) · `stress_test.py` ·
+`amex_r1_profitability.ipynb` (production notebook) · `requirements.txt`.
